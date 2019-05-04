@@ -42,10 +42,14 @@ class Channel:
     bandwidth: float
     failed: bool = False
     used_for: int = 0
-    dual: Optional["Channel"] = None
+    dual: "Channel" = None
 
     def __repr__(self):
         return f"Channel({self.from_.ip},{self.to.ip})"
+
+    def clear(self):
+        self.failed = False
+        self.used_for = 0
 
 
 BroadcastEvent = NamedTuple("BroadcastEvent", (("channel", Channel), ("hops", int), ("ip", IP)))
@@ -125,10 +129,13 @@ class Networking:
     stop_world_period: Optional[int] = None
 
     def initial_events(self) -> List[event_loop.NewEvent]:
-        return []
+        return [
+            event_loop.NewEvent(StopWorldEvent(), self.stop_world_period),
+        ]
 
     def stop_world(self, _) -> List[event_loop.NewEvent]:
-        return []
+        print("world stops, collecting statistics...")
+        return [event_loop.NewEvent(StopWorldEvent(), self.stop_world_period)]
 
     def channel_error(self, event: ChannelErrorEvent) -> List[event_loop.NewEvent]:
         pass
@@ -146,11 +153,13 @@ class Networking:
 def simulate(
         network: networkx.Graph,
         networking_class: Type[Networking] = Networking,
+        message_period=(1, 5 * MILLISECOND),
+        stop_world_period=50 * MILLISECOND,
         end_time: Optional[int] = None,
 ) -> Networking:
     nodes = {}
     node_count = count()
-    for identifier, d in network.nodes.data():
+    for identifier, d in sorted(network.nodes.data(), key=lambda x: x[0]):
         nodes[identifier] = Node(
             identifier=identifier,
             ip=next(node_count),
@@ -188,8 +197,8 @@ def simulate(
     controller = networking_class(
         nodes=nodes,
         channels=channels,
-        message_period=(500, SECOND),
-        stop_world_period=50 * MILLISECOND,
+        message_period=message_period,
+        stop_world_period=stop_world_period,
     )
     handlers = {
         StopWorldEvent: controller.stop_world,
