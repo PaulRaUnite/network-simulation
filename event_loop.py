@@ -43,6 +43,6 @@ class EventLoop:
 
     def run(self):
         for occurring, event in self.timeline:
-            if self.end_time and occurring < self.end_time:
+            if self.end_time and occurring > self.end_time:
                 break
             self.handle_event(occurring, event)
