@@ -26,7 +26,7 @@ class EventLoop:
     def __init__(
             self,
             initial_events: Iterable[NewEvent],
-            handlers: Dict[type, Callable[[Any], Iterable[NewEvent]]],
+            handlers: Dict[type, Callable[[int, Any], Iterable[NewEvent]]],
             end_time: Optional[int] = None,
     ):
         self.timeline = Timeline()
@@ -37,7 +37,7 @@ class EventLoop:
             self.timeline.add(event, occurring)
 
     def handle_event(self, occurring: int, event: Any):
-        new_events = self.handlers[type(event)](event)
+        new_events = self.handlers[type(event)](occurring, event)
         for event, time_shift in new_events:
             self.timeline.add(event, occurring + time_shift)
 
