@@ -6,6 +6,7 @@ from itertools import count, chain
 from typing import Dict, NamedTuple, Any, List, Iterable, Optional, Tuple, Type, Set
 
 import networkx
+from sortedcontainers import SortedDict
 
 import event_loop as eloop
 
@@ -16,6 +17,12 @@ SECOND = 1000 * MILLISECOND
 MINUTE = 60 * SECOND
 HOUR = 60 * MINUTE
 DAY = 24 * HOUR
+
+BYTE = 1
+KIBIBYTE = 1024
+MEBIBYTE = 1024*KIBIBYTE
+GIBIBYTE = 1024*MEBIBYTE
+
 
 IP = int
 
@@ -36,6 +43,7 @@ class Node:
     default_channel: Optional["Channel"] = None
 
     routing_interval: int = 50 * NANOSECOND
+    queued: int = 0
     queue: List["PacketEmitEvent"] = field(default_factory=list)
 
 
@@ -51,6 +59,7 @@ class Channel:
 
     error_ratio: Tuple[int, int] = (0, 1)
     packet_interval: int = 10 * NANOSECOND
+    queued: int = 0
     queue: List["PacketEmitEvent"] = field(default_factory=list)
 
     def __repr__(self):
@@ -65,7 +74,7 @@ BroadcastEvent = NamedTuple("BroadcastEvent", (("channel", Channel), ("hops", in
 
 def broadcast_events(channels, hops, ip):
     for ch in channels:
-        yield eloop.NewEvent(BroadcastEvent(ch, hops + 1, ip), 1)
+        yield eloop.NewEvent(BroadcastEvent(ch, hops + ch.bandwidth, ip), 1)
 
 
 def handle_broadcast(occurred: int, event: BroadcastEvent) -> Iterable[eloop.NewEvent]:
@@ -142,9 +151,9 @@ RoutingEvent = NamedTuple(
 
 
 def send_packet(ch: Channel, packet: PacketEmitEvent) -> eloop.NewEvent:
-    interval = int(ch.bandwidth * packet.byte_length) + ch.packet_interval if ch.busy else 0
+    interval = int(ch.bandwidth * packet.byte_length) + (ch.packet_interval if ch.busy else 0)
     ch.busy = True
-    ch.used_for = interval
+    ch.used_for += interval
     return eloop.NewEvent(PacketTransitEvent(ch, *packet), interval)
 
 
@@ -154,6 +163,7 @@ def remit_packet(computer: Node, packet: PacketEmitEvent) -> Optional[eloop.NewE
         interval = computer.routing_interval
         events.append(eloop.NewEvent(RoutingEvent(computer, interval), interval))
     computer.queue.append(packet)
+    computer.queued += 1
     return events
 
 
@@ -164,9 +174,9 @@ class Networking:
             message_ratio: Tuple[int, int],
             emit_ratio: Tuple[int, int],
             rand: random.Random,
-            stop_world_period: Optional[int] = None
+            stop_world_period: Optional[int] = None,
     ):
-        self.nodes: Dict[IP, Node] = {node.ip: node for node in nodes}
+        self.nodes: Dict[IP, Node] = SortedDict({node.ip: node for node in nodes})
         self.channels = channels
         self.message_period: float = message_ratio[0] / message_ratio[1]
         self.stop_world_period = stop_world_period
@@ -180,15 +190,20 @@ class Networking:
                 (node for node in nodes if NetworkTraits.SERVER in node.trait),
             ) if node1 is not node2
         ]
-        self.message_index = count()
+        self.message_id_counter = count()
+        self.message_index: Dict[int, int] = {}
         self.messages_start = {}
-        self.messages_finish = {}
+        self.messages_finish = SortedDict()
+
+        self.channel_usage: List[List[Tuple[IP, IP, int]]] = []
+        self.channel_buffers: List[List[Tuple[IP, IP, int]]] = []
+        self.node_buffers: List[List[Tuple[IP, int]]] = []
 
     def _generate_message(self, rand: random.Random):
         return eloop.NewEvent(
             MessageEvent(
                 *rand.choice(self.conn_ip_candidates),
-                rand.randint(128, 2 ** 20),
+                rand.randint(128, MEBIBYTE),
                 rand,
             ),
             int(rand.expovariate(self.message_period)),
@@ -211,12 +226,34 @@ class Networking:
             event = self._generate_error(ch, random.Random(next_int()))
             if event:
                 events.append(event)
+
         if self.stop_world_period:
             events.append(eloop.NewEvent(StopWorldEvent(), self.stop_world_period))
+
         return events
 
     def stop_world(self, _, __) -> List[eloop.NewEvent]:
-        print("simulation stops, collecting statistics...")
+        print(f"{len(self.channel_usage)}: collecting statistics...")
+
+        ch_usage = []
+        ch_buffers = []
+
+        for ch in self.channels:
+            ch_usage.append((ch.from_.ip, ch.to.ip, ch.used_for))
+            ch_buffers.append((ch.from_.ip, ch.to.ip, ch.queued))
+
+            ch.used_for = 0
+            ch.queued = 0
+
+        n_buffers = []
+        for node in self.nodes.values():
+            n_buffers.append((node.ip, node.queued))
+            node.queued = 0
+
+        self.channel_usage.append(ch_usage)
+        self.channel_buffers.append(ch_buffers)
+        self.node_buffers.append(n_buffers)
+
         return [eloop.NewEvent(StopWorldEvent(), self.stop_world_period)]
 
     def channel_error(self, _, event: ChannelErrorEvent) -> List[eloop.NewEvent]:
@@ -224,7 +261,8 @@ class Networking:
         return [self._generate_error(*event)]
 
     def message(self, occurred: int, event: MessageEvent) -> List[eloop.NewEvent]:
-        message_id = next(self.message_index)
+        message_id = next(self.message_id_counter)
+        self.message_index[message_id] = event.byte_length
         whole, tail = event.byte_length // 1024, event.byte_length % 1024
         parts = itertools.chain(itertools.repeat(1024, times=whole), (tail,) if tail else ())
         parts_amount = whole + int(bool(tail))
@@ -280,6 +318,7 @@ class Networking:
 
         ch = self._routing_strategy(node, packet)
         if ch.busy:
+            ch.queued += 1
             ch.queue.append(packet)
         else:
             events.append(send_packet(ch, packet))
@@ -311,8 +350,10 @@ def simulate(
         node1 = nodes[node1]
         node2 = nodes[node2]
 
-        c1 = Channel(node1, node2, data["bandwidth"])
-        c2 = Channel(node2, node1, data["bandwidth"])
+        data, per_time = data["bandwidth"]
+        ratio = per_time/data
+        c1 = Channel(node1, node2, ratio)
+        c2 = Channel(node2, node1, ratio)
 
         c1.dual = c2
         c2.dual = c1
@@ -340,7 +381,7 @@ def simulate(
         message_ratio=message_ratio,
         stop_world_period=stop_world_period,
         rand=random.Random(0),
-        emit_ratio=(1, MILLISECOND)
+        emit_ratio=(1, MILLISECOND),
     )
     handlers = {
         StopWorldEvent: controller.stop_world,
