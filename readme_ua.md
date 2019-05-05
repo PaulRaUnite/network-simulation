@@ -96,7 +96,7 @@
 
 Далі наведені результати симуляцій для наступного графа:
 
-[Network](./images/graph.png)
+![Network](./images/graph.png)
 
 Усі симуляції відбувалися напротязі однієї **секунди**, 
 з кроком збору статистики **50 мілісекунд**. Маршрутизація одного пакета відбувається за
@@ -109,11 +109,11 @@
 Для даних констант проведені 5 експериментів різних комбінацій стратегій.
 Результати наведені нижче:
 
-[FIFO+FIRST](./images/fifo_first.png)
-[FIFO+RANDOM](./images/fifo_random.png)
-[FIFO+WEIGTH RANDOM](./images/fifo_weight_random.png)
-[FIFO+RANDOM](./images/lifo_random.png)
-[FIFO+WEIGHT RANDOM](./images/lifo_weight_random.png)
+![FIFO+FIRST](./images/fifo_first.png)
+![FIFO+RANDOM](./images/fifo_random.png)
+![FIFO+WEIGTH RANDOM](./images/fifo_weight_random.png)
+![FIFO+RANDOM](./images/lifo_random.png)
+![FIFO+WEIGHT RANDOM](./images/lifo_weight_random.png)
 
 Легенда (зліва напрво, зверху вниз, середні з кроком 50мс):
 1. теплова карта ефективності (відношення використання до простою) каналу;
@@ -125,7 +125,7 @@
 6. графік відношення часу на розмір повідомлення.
 
 Порівняння:
-[Comparison](./images/comparison.png)
+![Comparison](./images/comparison.png)
 
 Легенда:
 1. середня ефективність каналу;
