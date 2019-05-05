@@ -24,7 +24,7 @@ nx.draw_networkx_edge_labels(net, pos, {
 plt.show()
 
 
-def simulate_and_draw(description: str, networking_type) -> Tuple[float, float, float, float]:
+def simulate_and_draw(description: str, networking_type) -> Tuple[float, float, float, float, int]:
     random.seed(0)
     simulation_time = framework.SECOND
     c = framework.simulate(net, networking_class=networking_type, end_time=simulation_time)
@@ -90,6 +90,7 @@ def simulate_and_draw(description: str, networking_type) -> Tuple[float, float, 
         channels_avg_buf.sum() / len(c.channels),
         nodes_avg_buf.sum() / len(c.nodes),
         messages_statistics[..., 3].sum() / len(messages_statistics),
+        len(messages_statistics),
     )
 
 
@@ -148,7 +149,7 @@ for descr, net_class in (("FIFO+FIRST", framework.Networking),
 names = list(results.keys())
 results = np.array(list(results.values()))
 
-fig, ax = plt.subplots(2, 2, figsize=(30, 30))
+fig, ax = plt.subplots(3, 2, figsize=(30, 30))
 index = np.arange(len(results))
 bar_width = 0.2
 opacity = 0.8
@@ -156,10 +157,11 @@ opacity = 0.8
 comp = ("Avg channel usage, %",
         "Avg channel buffered packets per 50ms",
         "Avg nodes buffered packets per 50ms",
-        "Avg time/length message ratio")
+        "Avg time/length message ratio",
+        "Delivered messages")
 
-for j in range(4):
-    x, y = ((0, 0), (0, 1), (1, 0), (1, 1))[j]
+for j in range(5):
+    x, y = ((0, 0), (0, 1), (1, 0), (1, 1), (2, 0))[j]
     ax[x, y].bar(index, results[..., j], color=["blue", "orange", "green", "red", "purple"], alpha=opacity)
     ax[x, y].set_xticks(index)
     ax[x, y].set_xticklabels(names)
