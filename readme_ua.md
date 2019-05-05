@@ -109,11 +109,20 @@
 Для даних констант проведені 5 експериментів різних комбінацій стратегій.
 Результати наведені нижче:
 
+1. FIFO+FIRST
 ![FIFO+FIRST](./images/fifo_first.png)
+
+2. FIFO+RANDOM
 ![FIFO+RANDOM](./images/fifo_random.png)
+
+3. FIFO+WEIGHT RANDOM
 ![FIFO+WEIGTH RANDOM](./images/fifo_weight_random.png)
-![FIFO+RANDOM](./images/lifo_random.png)
-![FIFO+WEIGHT RANDOM](./images/lifo_weight_random.png)
+
+4. LIFO+RANDOM
+![LIFO+RANDOM](./images/lifo_random.png)
+
+5. LIFO+WEIGHT RANDOM
+![LIFO+WEIGHT RANDOM](./images/lifo_weight_random.png)
 
 Легенда (зліва напрво, зверху вниз, середні з кроком 50мс):
 1. теплова карта ефективності (відношення використання до простою) каналу;
