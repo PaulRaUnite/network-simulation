@@ -153,6 +153,7 @@ RoutingEvent = NamedTuple(
 def send_packet(ch: Channel, packet: PacketEmitEvent) -> eloop.NewEvent:
     interval = int(ch.bandwidth * packet.byte_length) + (ch.packet_interval if ch.busy else 0)
     ch.busy = True
+    ch.fail = False
     ch.used_for += interval
     return eloop.NewEvent(PacketTransitEvent(ch, *packet), interval)
 
@@ -263,8 +264,8 @@ class Networking:
     def message(self, occurred: int, event: MessageEvent) -> List[eloop.NewEvent]:
         message_id = next(self.message_id_counter)
         self.message_index[message_id] = event.byte_length
-        whole, tail = event.byte_length // 1024, event.byte_length % 1024
-        parts = itertools.chain(itertools.repeat(1024, times=whole), (tail,) if tail else ())
+        whole, tail = event.byte_length // KIBIBYTE, event.byte_length % KIBIBYTE
+        parts = itertools.chain(itertools.repeat(KIBIBYTE, times=whole), (tail,) if tail else ())
         parts_amount = whole + int(bool(tail))
         rand = random.Random(event.rand.randint(0, 1000))
 
@@ -286,7 +287,6 @@ class Networking:
     def transit_package(self, _, event: PacketTransitEvent) -> List[eloop.NewEvent]:
         ch = event.channel
         if ch.fail:
-            ch.fail = False
             return [send_packet(ch, PacketEmitEvent(*event[1:]))]
 
         events = remit_packet(ch.to, PacketEmitEvent(*event[1:]))

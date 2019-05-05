@@ -137,7 +137,7 @@ class LifoWeightedRandom(framework.Networking):
 
 
 results = OrderedDict()
-for descr, net_class in (("Default", framework.Networking),
+for descr, net_class in (("FIFO+FIRST", framework.Networking),
                          ("FIFO+RANDOM", FifoRandom),
                          ("LIFO+RANDOM", LifoRandom),
                          ("FIFO+WEIGHT RANDOM", FifoWeightedRandom),
@@ -153,10 +153,10 @@ index = np.arange(len(results))
 bar_width = 0.2
 opacity = 0.8
 
-comp = ("Avg channel efficiency",
-        "Avg channel buffer",
-        "Avg nodes buffer",
-        "Avg time/length msg ratio")
+comp = ("Avg channel usage, %",
+        "Avg channel buffered packets per 50ms",
+        "Avg nodes buffered packets per 50ms",
+        "Avg time/length message ratio")
 
 for j in range(4):
     x, y = ((0, 0), (0, 1), (1, 0), (1, 1))[j]
