@@ -55,3 +55,11 @@ fabric.properties
 
 .idea
 venv
+
+report_tex_ua\.aux
+report_tex_ua\.dvi
+report_tex_ua\.log
+report_tex_ua\.synctex\.gz
+report_tex_ua\.toc
+
+report_tex_ua\.out
